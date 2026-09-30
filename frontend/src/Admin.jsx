@@ -1,3 +1,4 @@
+import BrandLoader from './components/feedback/BrandLoader';
 import {useState,useEffect,useCallback} from 'react';
 import {Link} from 'react-router-dom';
 import {LayoutDashboard,ShoppingBag,Utensils,Boxes,Settings,LogOut,Store,Building2,Users,Plus,Search,RefreshCw,Clock,IndianRupee,ChevronRight,ChefHat,Truck,TrendingUp,ShieldCheck,Lock,Menu as MenuIcon,Leaf,Trash2} from 'lucide-react';
@@ -16,7 +17,7 @@ export default function Admin({superMode=false}){
  useEffect(()=>{if(!user)return;load();const t=setInterval(load,12000);return()=>clearInterval(t)},[user,load]);
  async function mutate(path,body,method='POST',message='Saved successfully'){setBusy(true);try{const result=await api(path,{method,body});await load();toast.success(message);return result}catch(e){toast.error(e.message);throw e}finally{setBusy(false)}}
  async function logout(){try{await api('/auth/logout',{method:'POST'});setUser(null);setData(null)}catch(e){toast.error(e.message)}}
- if(user===undefined)return <div className='portal-loading'><img src='/logo.png' alt='RedHandi'/><RefreshCw className='spin'/></div>;
+ if(user===undefined)return <BrandLoader message='Getting your kitchen ready.'/>;
  if(!user)return <Login onLogin={u=>{setUser(u);setError('')}} superMode={superMode}/>;
  if(superMode&&user.role!=='super_admin')return <div className='empty-state'><ShieldCheck size={36}/><h2>Super admin access is required.</h2><Link className='button red' to='/admin'>Open your kitchen</Link></div>;
  const menu=superMode?[['overview','Overview',LayoutDashboard],['restaurants','Restaurants',Building2],['outlets','Outlets',Store],['team','Team & access',Users]]:[['overview','Overview',LayoutDashboard],['orders','Orders',ShoppingBag],['menu','Menu management',Utensils],['inventory','Inventory',Boxes],['settings','Kitchen settings',Settings]];
