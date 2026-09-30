@@ -47,8 +47,8 @@ Set `FRONTEND_DIST` on the backend to serve the built frontend from a different 
 
 ## Brand animations
 
-The frontend includes a CSS 3D logo loader and a confirmation dialog with a short confetti animation. The confirmation appears only after the API reports a paid, confirmed order (or an explicitly labelled development preview order), including delayed payment confirmation. Pending, failed, cancelled, expired, and previously viewed orders do not trigger a new celebration. Customers can close the dialog immediately to track or cancel their order; the cancellation clock continues to run from the server confirmation time.
+The frontend includes a clean logo loader with a red-and-gold orbit and a confirmation dialog with a short confetti animation. The confirmation appears only after the API reports a paid, confirmed order (or an explicitly labelled development preview order), including delayed payment confirmation. Pending, failed, cancelled, expired, and previously viewed orders do not trigger a new celebration. Customers can close the dialog immediately to track or cancel their order; the cancellation clock continues to run from the server confirmation time.
 
-Both animations respect the device's reduced-motion preference. No WebGL or additional animation dependency is required.
+Both animations respect the device's reduced-motion preference. The original logo stays flat and crisp, without duplicated layers or perspective distortion. No additional animation dependency is required.
 
 Run the confirmation-state regression checks with `npm test --prefix frontend`.
