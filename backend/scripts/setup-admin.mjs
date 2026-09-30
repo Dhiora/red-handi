@@ -1,0 +1,14 @@
+import 'dotenv/config';
+import {createInterface} from 'node:readline/promises';
+import {stdin,stdout} from 'node:process';
+import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
+import {User} from '../src/models.js';
+if(!process.env.MONGODB_URI)throw new Error('Set MONGODB_URI in .env first.');
+const rl=createInterface({input:stdin,output:stdout});
+const email=(await rl.question('Super admin email [admin@redhandi.com]: ')).trim()||'admin@redhandi.com';
+stdout.write('Set a password of at least 12 characters (input is hidden): ');
+rl._writeToOutput=()=>{};
+const password=await rl.question('');rl.close();stdout.write('\n');
+if(password.length<12)throw new Error('Password must have at least 12 characters.');
+await mongoose.connect(process.env.MONGODB_URI);await User.updateOne({email:email.toLowerCase()},{$set:{name:'RedHandi Owner',role:'super_admin',active:true,passwordHash:await bcrypt.hash(password,12)}},{upsert:true});await mongoose.disconnect();console.log('Super admin account is ready.');

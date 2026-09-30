@@ -1,0 +1,9 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {BrowserRouter,Routes,Route} from 'react-router-dom';
+import {Toaster} from 'sonner';
+import Storefront from './Storefront.jsx';
+import Track from './Track.jsx';
+import Admin from './Admin.jsx';
+import './styles.css';
+createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/' element={<Storefront/>}/><Route path='/track' element={<Track/>}/><Route path='/track/:id' element={<Track/>}/><Route path='/admin' element={<Admin/>}/><Route path='/super-admin' element={<Admin superMode/>}/><Route path='*' element={<div className='empty-state'><h1>This page wandered off.</h1><a className='button red' href='/'>Back to RedHandi</a></div>}/></Routes><Toaster richColors position='top-center'/></BrowserRouter>);

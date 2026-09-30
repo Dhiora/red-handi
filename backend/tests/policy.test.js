@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {cancellationQuote,getSlots,validateSlot,canTransition} from '../src/policy.js';
+import {verifyHmac} from '../src/payments.js';
+import crypto from 'node:crypto';
+const confirmedAt=new Date('2026-09-29T10:00:00Z');const order={confirmedAt,total:27900,cancellationPercent:12.5};
+test('free cancellation through exactly 3 minutes; percentage applies immediately after',()=>{assert.equal(cancellationQuote(order,+confirmedAt+180000).fee,0);const q=cancellationQuote(order,+confirmedAt+180001);assert.equal(q.fee,3488);assert.equal(q.refund,24412)});
+test('unconfirmed order has no cancellation charge',()=>assert.equal(cancellationQuote({...order,confirmedAt:null}).fee,0));
+test('IST pickup slots honor opening hours, lead time, and a seven-day horizon',()=>{const o={opening:'11:00',closing:'23:00',leadMinutes:30};const now=new Date('2026-09-29T05:20:00Z').getTime();const slots=getSlots(o,now);assert.equal(slots[0],'2026-09-29T06:00:00.000Z');assert.ok(slots.every(s=>new Date(s).getTime()>=now+30*60000));assert.throws(()=>validateSlot(o,'2026-09-29T05:30:00Z',now));assert.throws(()=>validateSlot(o,'not a date',now))});
+test('delivery and pickup use appropriate status transitions',()=>{assert.equal(canTransition({status:'confirmed',fulfilment:'pickup'},'completed'),false);assert.equal(canTransition({status:'ready',fulfilment:'pickup'},'completed'),true);assert.equal(canTransition({status:'ready',fulfilment:'delivery'},'completed'),false);assert.equal(canTransition({status:'cancelled'},'preparing'),false)});
+test('payment signatures reject tampering and missing secrets',()=>{const body='order_a|pay_b',key='test-only-secret';const sig=crypto.createHmac('sha256',key).update(body).digest('hex');assert.equal(verifyHmac(body,sig,key),true);assert.equal(verifyHmac(body+'x',sig,key),false);assert.equal(verifyHmac(body,'bad',key),false);assert.equal(verifyHmac(body,sig,''),false)});
