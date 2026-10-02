@@ -52,3 +52,13 @@ The frontend includes a clean logo loader with a red-and-gold orbit and a confir
 Both animations respect the device's reduced-motion preference. The original logo stays flat and crisp, without duplicated layers or perspective distortion. No additional animation dependency is required.
 
 Run the confirmation-state regression checks with `npm test --prefix frontend`.
+
+## Customer self-ordering and table QR codes
+
+Open `/inperson` for the animated RedHandi introduction, menu, mobile-number checkout, and printable itemized bill. These orders are confirmed immediately, reserve stock, and show payment due at the restaurant. The confirmation page refreshes status every 10 seconds and provides a private tracking link. No SMS is sent and no online payment is taken in this flow.
+
+In `/admin`, open **Restaurant layout**, add named tables, and download each table's QR image. Generate codes using the live website's public address before printing; localhost codes cannot be used by guests on their phones. Pausing a table disables new orders from its code. Table identity is resolved by the server from an opaque QR token.
+
+The Orders queue includes all active orders, oldest first, plus the latest 250 closed orders. Staff move table orders through Start preparing → Mark ready → Mark served and record payment using **Collect** after receiving it. Table orders and direct in-person orders share the existing numbering and stock system. The admin refreshes every 12 seconds. Paid restaurant-order cancellations must be handled by the restaurant; they do not trigger Razorpay refunds.
+
+The `/inperson` introduction is a full-screen Three.js cartoon, modeled and animated in Blender. It uses the supplied Red Handi blueprint as a style reference: red polo/cap, black apron, bearded chef and warm restaurant interior. After server confirmation, the host carries the numbered order slip to the kitchen. The editable Blender source and rebuild instructions are in `art/restaurant/`. The scene supports pause, opt-in voice, reduced motion, and a poster fallback.

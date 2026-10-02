@@ -26,3 +26,36 @@ test('outlet admins cannot read another kitchen or elevate access',async()=>{con
 test('manual removal cannot consume stock reserved for orders',async()=>{const result=await createOrder(payload());const ingredient=await Ingredient.findById(item.recipe[0].ingredientId);const res=await agent.post('/api/admin/ingredients/'+ingredient.id+'/adjust').set('X-RH-Request','1').send({quantity:ingredient.stock,type:'wastage',note:'Test wastage'});assert.equal(res.status,409);await cancelOrder(result.order._id,0)});
 test('expired unpaid orders release stock; late captured payment queues full refund',async()=>{const result=await createOrder(payload());await Order.updateOne({_id:result.order._id},{$set:{status:'pending_payment',paymentStatus:'pending',paymentId:null,confirmedAt:null,preview:false}});await expireOrder(result.order._id);const paid=await confirmPayment(result.order._id,'pay_test_late',item.price);assert.equal(paid.status,'cancelled');assert.equal(paid.cancellationFee,0);assert.equal(paid.refundAmount,item.price);assert.equal(paid.refundStatus,'queued');const again=await confirmPayment(result.order._id,'pay_test_late',item.price);assert.equal(again.refundAmount,item.price)});
 test('forged Razorpay webhooks are rejected',async()=>{const res=await request(app).post('/api/payments/webhook').set('X-Razorpay-Signature','f'.repeat(64)).send({event:'payment.captured'});assert.equal(res.status,401)});
+test('table QR self-orders attach table, reserve once, bill due and progress through service',async()=>{
+ const table=await agent.post('/api/admin/tables').set('X-RH-Request','1').send({outletId:outlet.id,name:'Garden 01'});assert.equal(table.status,200);
+ const menu=await request(app).get('/api/tables/'+table.body.token);assert.equal(menu.body.name,'Garden 01');
+ const body={outletId:outlet.id,mobile:'9000000000',tableToken:table.body.token,items:[{id:item.id,quantity:1}],idempotencyKey:crypto.randomUUID(),accessToken:crypto.randomBytes(32).toString('hex'),total:1};
+ const first=await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send(body);assert.equal(first.status,200);const order=first.body.order;assert.equal(order.tableName,'Garden 01');assert.equal(order.fulfilment,'dine_in');assert.equal(order.total,item.price);assert.equal(order.paymentStatus,'due');assert.equal(order.status,'confirmed');
+ const retry=await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send(body);assert.equal(retry.body.order._id,order._id);
+ for(const status of ['preparing','ready','completed'])assert.equal((await agent.patch('/api/admin/orders/'+order._id+'/status').set('X-RH-Request','1').send({status})).status,200);
+ assert.equal((await agent.post('/api/admin/orders/'+order._id+'/collect').set('X-RH-Request','1').send({})).status,200);assert.equal((await Order.findById(order._id)).paymentStatus,'paid');
+ await agent.patch('/api/admin/tables/'+table.body._id).set('X-RH-Request','1').send({active:false});assert.equal((await request(app).get('/api/tables/'+table.body.token)).status,404);
+ assert.equal((await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send({...body,idempotencyKey:crypto.randomUUID()})).status,404);
+});
+test('tables can be renamed, marked free, and deleted only when no orders are in progress',async()=>{
+ const table=await agent.post('/api/admin/tables').set('X-RH-Request','1').send({outletId:outlet.id,name:'Patio 01'});assert.equal(table.status,200);
+ const renamed=await agent.patch('/api/admin/tables/'+table.body._id).set('X-RH-Request','1').send({name:'Patio 02'});assert.equal(renamed.body.name,'Patio 02');assert.equal(renamed.body.token,table.body.token);
+ const body={outletId:outlet.id,mobile:'9000000000',tableToken:table.body.token,items:[{id:item.id,quantity:1}],idempotencyKey:crypto.randomUUID(),accessToken:crypto.randomBytes(32).toString('hex'),total:1};
+ const order=(await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send(body)).body.order;assert.equal(order.tableName,'Patio 02');
+ const data=await agent.get('/api/admin/data?outlet='+outlet.id);const listed=data.body.tables.find(t=>t._id===table.body._id);assert.ok(listed);assert.equal('token' in listed,false);
+ assert.equal((await agent.delete('/api/admin/tables/'+table.body._id).set('X-RH-Request','1')).status,409);
+ for(const status of ['preparing','ready','completed'])await agent.patch('/api/admin/orders/'+order._id+'/status').set('X-RH-Request','1').send({status});
+ const cleared=await agent.patch('/api/admin/tables/'+table.body._id).set('X-RH-Request','1').send({cleared:true});assert.equal(cleared.status,200);assert.ok(cleared.body.clearedAt);
+ assert.equal((await agent.delete('/api/admin/tables/'+table.body._id).set('X-RH-Request','1')).status,200);
+ assert.equal((await request(app).get('/api/tables/'+table.body.token)).status,404);assert.equal((await Order.findById(order._id)).tableName,'Patio 02');
+});
+test('direct self-order requires mobile and ignores client table names',async()=>{
+ const body={outletId:outlet.id,mobile:'9000000000',items:[{id:item.id,quantity:1}],idempotencyKey:crypto.randomUUID(),accessToken:crypto.randomBytes(32).toString('hex'),tableName:'Forged table'};
+ assert.equal((await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send({...body,mobile:''})).status,400);
+ const result=await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send(body);assert.equal(result.status,200);assert.equal(result.body.order.tableName,undefined);assert.equal(result.body.order.source,'inperson');assert.equal(result.body.order.paymentStatus,'due');await cancelOrder(result.body.order._id,0);
+});
+test('table management requires login and invalid QR tokens cannot place orders',async()=>{
+ assert.equal((await request(app).post('/api/admin/tables').set('X-RH-Request','1').send({outletId:outlet.id,name:'Denied'})).status,401);
+ const body={outletId:outlet.id,mobile:'9000000000',tableToken:'a'.repeat(48),items:[{id:item.id,quantity:1}],idempotencyKey:crypto.randomUUID(),accessToken:crypto.randomBytes(32).toString('hex')};
+ assert.equal((await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send(body)).status,404);
+});
