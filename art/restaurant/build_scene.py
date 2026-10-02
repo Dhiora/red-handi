@@ -273,13 +273,21 @@ def key(o,field,frame):o.keyframe_insert(data_path=field,frame=frame)
 # Bake a 16-second scene; clips are split into two named glTF animations after export.
 for f in range(1,482,3):
  t=(f-1)/30;order=f>=241;u=max(0,min(1,(t-8)/6));smooth=u*u*(3-2*u)
- host.location=(.8-.65*smooth,-.65+2.18*smooth,0);host.rotation_euler.z=math.pi*min(1,u*3)
- body.location.z=.016*math.sin(t*math.tau)+(.035*abs(math.sin(t*10)) if order and u<1 else 0)
- head.rotation_euler=(.035*math.sin(t*2),.045*math.sin(t*1.5),.06*math.sin(t*1.3))
+ entrance=min(1,t/3.6);ease=entrance*entrance*(3-2*entrance)
+ host.location=(.8-.65*smooth,-.65+2.18*smooth,0) if order else (.25+.55*ease,1.53-2.18*ease,0)
+ host.rotation_euler.z=math.pi*min(1,u*3) if order else -.14*(1-ease)
+ walking=(order and u<1) or (not order and entrance<1)
+ body.location.z=.016*math.sin(t*math.tau)+(.027*abs(math.sin(t*9)) if walking else 0)
+ head.rotation_euler=(.045*math.sin(t*2),.035*math.sin(t*1.5),.025*math.sin(t*1.3))
  for side,(shoulder,elbow,hand,hip) in limbs.items():
-  if not order:
-   shoulder.rotation_euler=(.12,.65 if side=='left' else -.55,0)
-   elbow.rotation_euler=(0,2.2+.23*math.sin(t*7) if side=='left' else -1.0+.1*math.sin(t*2),0)
+  if not order and entrance<1:
+   phase=t*9+(math.pi if side=='left' else 0)
+   shoulder.rotation_euler=(-.20*math.sin(phase),.08 if side=='left' else -.08,0)
+   elbow.rotation_euler=(-.2,0,0)
+   hip.rotation_euler=(.26*math.sin(phase),0,0)
+  elif not order:
+   shoulder.rotation_euler=(.12,.45 if side=='left' else -.48,0)
+   elbow.rotation_euler=(0,1.45+.12*math.sin(t*2) if side=='left' else -.7+.1*math.sin(t*2),0)
    hip.rotation_euler=(0,.02*math.sin(t*2),0)
   else:
    moving=u<1;phase=t*9+(math.pi if side=='left' else 0)

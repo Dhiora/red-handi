@@ -18,8 +18,8 @@ export async function createRestaurantScene(container,{order,paused,onReady,onEr
  let disposed=false,mixer=null,action=null,last=0,frame=0,isPaused=paused,finished=false,root=null;
  function resize(){const width=container.clientWidth,height=container.clientHeight;if(!width||!height)return;camera.aspect=width/height;
   if(camera.aspect<.8){camera.fov=48;camera.position.set(1.7,3.4,8.1);camera.lookAt(.55,1.65,-.8)}
-  else if(camera.aspect<1.25){camera.fov=42;camera.position.set(3.3,3.9,9.4);camera.lookAt(.1,1.65,-1)}
-  else{camera.fov=39;camera.position.set(3.7,4.6,9.8);camera.lookAt(-.35,1.55,-1.2)}
+  else if(camera.aspect<1.25){camera.fov=42;camera.position.set(1.5,2.9,8.2);camera.lookAt(.3,1.8,-.5)}
+  else{camera.fov=39;camera.position.set(1.3,2.65,7.5);camera.lookAt(.25,1.9,-.3)}
   camera.updateProjectionMatrix();renderer.setSize(width,height,false);renderer.render(scene,camera);
  }
  const observer=new ResizeObserver(resize);observer.observe(container);resize();
@@ -34,14 +34,14 @@ export async function createRestaurantScene(container,{order,paused,onReady,onEr
   if(order){const ticket=root.getObjectByName('TicketFace');if(ticket){const canvas=document.createElement('canvas');canvas.width=256;canvas.height=384;const c=canvas.getContext('2d');c.fillStyle='#fff9e7';c.fillRect(0,0,256,384);c.fillStyle='#8d2c20';c.textAlign='center';c.font='bold 26px sans-serif';c.fillText('REDHANDI',128,48);c.fillStyle='#30251f';c.font='bold 28px sans-serif';c.fillText('#'+order.number,128,101,230);c.font='18px sans-serif';c.fillText(order.tableName||'IN-PERSON',128,133,230);c.textAlign='left';c.font='16px sans-serif';(order.items||[]).slice(0,6).forEach((item,i)=>c.fillText(`${item.quantity} × ${item.name}`,20,181+i*27,215));c.strokeStyle='#c5ac83';c.beginPath();c.moveTo(20,151);c.lineTo(236,151);c.stroke();const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.flipY=false;const material=new THREE.MeshStandardMaterial({map:texture,roughness:.85,side:THREE.DoubleSide});ticket.material=material;resources.textures.add(texture);resources.materials.add(material)}}
   if(!gltf.animations.length)throw new Error('Restaurant animation is missing');
   const timeline=new THREE.AnimationClip('RestaurantTimeline',-1,gltf.animations.filter(clip=>! /^(Chef|Steam)/.test(clip.name)).flatMap(clip=>clip.tracks));
-  mixer=new THREE.AnimationMixer(root);const clip=THREE.AnimationUtils.subclip(timeline,order?'DeliverOrder':'Welcome',order?240:0,order?481:240,30);action=mixer.clipAction(clip);action.setLoop(order?THREE.LoopOnce:THREE.LoopRepeat,order?1:Infinity);action.clampWhenFinished=true;action.play();
+  mixer=new THREE.AnimationMixer(root);const clip=THREE.AnimationUtils.subclip(timeline,order?'DeliverOrder':'Welcome',order?240:0,order?481:240,30);action=mixer.clipAction(clip);action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();
   const cookingTimeline=new THREE.AnimationClip('CookingTimeline',-1,gltf.animations.filter(clip=>/^(Chef|Steam)/.test(clip.name)).flatMap(clip=>clip.tracks));
   mixer.clipAction(THREE.AnimationUtils.subclip(cookingTimeline,'Cooking',0,240,30)).play();mixer.update(0);
-  if(isPaused&&order){action.time=Math.max(0,clip.duration-.01);mixer.update(0);finished=true;onComplete?.()}
-  mixer.addEventListener('finished',event=>{if(event.action===action){finished=true;onComplete?.()}});
+  if(isPaused){action.time=order?Math.max(0,clip.duration-.01):5;mixer.update(0);if(order){finished=true;onComplete?.()}}
+  mixer.addEventListener('finished',event=>{if(event.action!==action)return;if(order){finished=true;onComplete?.()}else{const idle=mixer.clipAction(THREE.AnimationUtils.subclip(timeline,'AttentiveWaiter',120,240,30));idle.reset().setLoop(THREE.LoopRepeat,Infinity).play();action.crossFadeTo(idle,.45,false);action=idle;}});
   onReady();renderer.render(scene,camera);
   function tick(time){if(disposed)return;frame=requestAnimationFrame(tick);if(document.hidden){last=time;return}if(time-last<1000/30)return;const dt=Math.min((time-last)/1000,.08);last=time;if(isPaused)return;mixer.update(dt);renderer.render(scene,camera)}
   frame=requestAnimationFrame(tick);
-  return {dispose,setPaused(value){isPaused=value},replay(){finished=false;action.reset().play();if(isPaused&&order){action.time=clip.duration-.01;mixer.update(0)}},};
+  return {dispose,setPaused(value){isPaused=value},replay(){finished=false;mixer.stopAllAction();action=mixer.clipAction(clip);action.reset().setLoop(THREE.LoopOnce,1).play();mixer.clipAction(THREE.AnimationUtils.subclip(cookingTimeline,'Cooking',0,240,30)).play();if(isPaused&&order){action.time=clip.duration-.01;mixer.update(0)}},};
  }catch(error){dispose();if(error.name!=='AbortError')onError('The 3D scene could not load. Your menu and ordering are still available.');return null}
 }
