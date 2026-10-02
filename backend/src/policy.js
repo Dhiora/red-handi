@@ -23,3 +23,7 @@ export function canTransition(order,next){
  const allowed={confirmed:['preparing'],preparing:['ready'],ready:order.fulfilment==='delivery'?['out_for_delivery']:['completed'],out_for_delivery:['completed']};
  return allowed[order.status]?.includes(next)||false;
 }
+export function formatOrderNumber(seq){
+ const cycle=Math.floor((seq-1)/999)+1,position=((seq-1)%999)+1,padded=String(position).padStart(3,'0');
+ return cycle>1?`${cycle}-${padded}`:padded;
+}
