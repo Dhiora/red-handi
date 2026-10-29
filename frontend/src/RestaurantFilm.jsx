@@ -1,9 +1,10 @@
 import {useEffect,useRef,useState} from 'react';
+import {FullscreenButton} from './components/ui';
 import './restaurant-welcome.css';
 
 /** Silent, AI-generated video playback. Ordering never depends on video playback. */
 export default function RestaurantFilm({film,order,tableName,disabled,loading,onOrder,onNewOrder,returnSeconds}){
- const player=useRef(null),section=useRef(null);
+ const player=useRef(null);
  const [src,setSrc]=useState(film?.src),[idle,setIdle]=useState(false),[ended,setEnded]=useState(false),[ready,setReady]=useState(false),[failed,setFailed]=useState(false),[playBlocked,setPlayBlocked]=useState(false);
  const [paused,setPaused]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const poster=order?'/cinema/thank-you-keyframe.png':film?.poster||'/cinema/waiter-keyframe.png';
@@ -13,12 +14,11 @@ export default function RestaurantFilm({film,order,tableName,disabled,loading,on
  function replay(){setEnded(false);setIdle(false);setPaused(false);setSrc(film.src);const video=player.current;if(video){video.currentTime=0;video.play().then(()=>setPlayBlocked(false)).catch(()=>setPlayBlocked(true))}}
  function play(){setPaused(false);player.current?.play().then(()=>setPlayBlocked(false)).catch(()=>setPlayBlocked(true))}
  function bill(){document.getElementById('inperson-bill')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})}
- async function full(){try{if(document.fullscreenElement)await document.exitFullscreen();else await section.current.requestFullscreen()}catch{}}
- return <section ref={section} className={'rh-cinema rh-film'+(order?' rh-thank-you':'')} aria-label={order?'Thank you for ordering at Red Handi':'Welcome to Red Handi'}>
+ return <section className={'rh-cinema rh-film'+(order?' rh-thank-you':'')} aria-label={order?'Thank you for ordering at Red Handi':'Welcome to Red Handi'}>
   <img className='rh-film-video rh-film-poster' src={poster} alt='' aria-hidden='true'/>
   {src&&!failed&&<video ref={player} className='rh-film-video' src={src} poster={poster} autoPlay={!paused} muted playsInline preload={paused?'none':'auto'} loop={idle} onLoadedData={()=>setReady(true)} onEnded={end} onError={()=>{setFailed(true);setPlayBlocked(false)}} aria-label={order?'Waiter carries the order to the chef':'Waiter approaches your table and welcomes you'}/>}
   <div className='rh-cinema-shade' aria-hidden='true'/>
-  <header className='rh-cinema-top'><a href='/' className='rh-cinema-brand'><img src='/logo.png' alt='Red Handi'/><span>REDHANDI<small>GOOD FOOD. GOOD MOOD.</small></span></a><div className='rh-cinema-tools'>{src&&!failed&&<button onClick={()=>ended?replay():setPaused(v=>!v)} aria-pressed={paused}>{ended?'Replay video':paused?'Play video':'Pause video'}</button>}{document.fullscreenEnabled&&<button onClick={full} aria-label='Toggle full screen'>⛶</button>}</div></header>
+  <header className='rh-cinema-top'><a href='/' className='rh-cinema-brand'><img src='/logo.png' alt='Red Handi'/><span>REDHANDI<small>GOOD FOOD. GOOD MOOD.</small></span></a><div className='rh-cinema-tools'>{src&&!failed&&<button onClick={()=>ended?replay():setPaused(v=>!v)} aria-pressed={paused}>{ended?'Replay video':paused?'Play video':'Pause video'}</button>}<FullscreenButton/></div></header>
   <div className='rh-cinema-title'><span className='rh-cinema-eyebrow'>{order?.tableName||tableName||'WELCOME TO REDHANDI'}</span><h1>{order?<>Thank you<br/><em>for ordering.</em></>:<>Make yourself<br/><em>at home.</em></>}</h1><p>{order?'Order #'+order.number:'Your favourites. Fresh from the handi.'}</p></div>
   {src&&!ready&&!paused&&!failed&&!playBlocked&&<div className='rh-scene-loading' role='status'><span/>Your host will be right with you…</div>}
   {playBlocked&&!paused&&!failed&&<button className='rh-film-play' onClick={play}>Play video</button>}

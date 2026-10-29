@@ -28,17 +28,18 @@ app.post('/api/payments/webhook',express.raw({type:'application/json',limit:'256
  res.json({received:true});
 }));
 app.use(express.json({limit:'64kb'}));app.use(cookieParser());
+function lanDevOrigin(origin){if(process.env.HOST_LAN!=='1'||process.env.NODE_ENV==='production'||!origin)return false;try{const url=new URL(origin);if(url.protocol!=='http:'||!['5173','4000'].includes(url.port))return false;const parts=url.hostname.split('.').map(Number);if(parts.length!==4||parts.some(n=>!Number.isInteger(n)||n<0||n>255))return false;const [a,b]=parts;return a===10||(a===192&&b===168)||(a===172&&b>=16&&b<=31)}catch{return false}}
 app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');if(['POST','PATCH','DELETE','PUT'].includes(req.method)){
  const origin=req.headers.origin;const allowed=[process.env.APP_ORIGIN,...(process.env.NODE_ENV!=='production'?['http://localhost:5173','http://127.0.0.1:5173','http://localhost:4000','http://127.0.0.1:4000']:[])].filter(Boolean);
- if(req.headers['x-rh-request']!=='1'||(origin&&!allowed.includes(origin)))return res.status(403).json({error:'Request origin is not allowed.'});}next()});
+ if(req.headers['x-rh-request']!=='1'||(origin&&!allowed.includes(origin)&&!lanDevOrigin(origin)))return res.status(403).json({error:'Request origin is not allowed.'});}next()});
 app.use('/api',rateLimit({windowMs:60000,limit:240,standardHeaders:'draft-8',legacyHeaders:false}));
 app.use('/api',authenticate);
 app.get('/api/health',(req,res)=>{const ok=mongoose.connection.readyState===1;res.status(ok?200:503).json({ok})});
 app.get('/api/menu',wrap(async(req,res)=>{
  const outlets=await Outlet.find({active:true}).lean();const outlet=outlets.find(o=>String(o._id)===req.query.outlet)||outlets[0];if(!outlet)return res.json({outlets:[],outlet:null,items:[],slots:[],preview:previewEnabled(),paymentsReady:paymentsReady()});
- const [items,ingredients,bookings]=await Promise.all([MenuItem.find({outletId:outlet._id}).lean(),Ingredient.find({outletId:outlet._id}).lean(),Slot.find({outletId:outlet._id,time:{$gte:new Date()},count:{$gte:outlet.slotCapacity}}).lean()]);
+ const [items,bookings]=await Promise.all([MenuItem.find({outletId:outlet._id}).lean(),Slot.find({outletId:outlet._id,time:{$gte:new Date()},count:{$gte:outlet.slotCapacity}}).lean()]);
  const full=new Set(bookings.map(s=>s.time.toISOString()));
- const menu=items.map(item=>{const max=item.recipe.length?Math.max(0,Math.min(...item.recipe.map(r=>{const ing=ingredients.find(i=>String(i._id)===String(r.ingredientId));return ing?Math.floor((ing.stock-ing.reserved+1e-8)/r.quantity):0}))):20;const {recipe,...rest}=item;return {...rest,available:item.available&&max>0,maxQuantity:Math.min(20,max)}});
+ const menu=items.map(item=>{const {recipe,...rest}=item;return {...rest,available:!!item.available,maxQuantity:20}});
  res.json({outlets:outlets.map(o=>({_id:o._id,name:o.name})),outlet,items:menu,slots:getSlots(outlet).filter(s=>!full.has(s)),preview:previewEnabled(),paymentsReady:paymentsReady()});
 }));
 app.get('/api/tables/:token',wrap(async(req,res)=>{const table=await DiningTable.findOne({token:req.params.token,active:true}).lean();if(!table||!await Outlet.exists({_id:table.outletId,active:true}))fail(404,'This table QR code is no longer available.');res.json({name:table.name,outletId:table.outletId})}));

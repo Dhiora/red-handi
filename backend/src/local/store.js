@@ -38,11 +38,11 @@ export function createCounterOrder(s,body,user){
  return s.tx(()=>{
   const existing=s.db.prepare('select id from orders where idem=?').get(key);if(existing)return s.order(existing.id);
   const outlet=s.get('outlet',data.outletId);if(!outlet?.active)fail(400,'This outlet is not accepting orders.');
-  const {lines,needs}=linesFor(s,outlet,data.items);reserve(s,needs,{strict:true});
+  const {lines,needs}=linesFor(s,outlet,data.items);
   const subtotal=lines.reduce((n,i)=>n+i.unitPrice*i.quantity,0),billing=billingSnapshot(outlet,subtotal,0);
   outlet.orderSeq=(outlet.orderSeq||0)+1;s.put('outlet',outlet);
   const now=nowIso(),paid=data.paymentMethod!=='due',takeaway=data.orderType==='takeaway';
-  return s.saveOrder({_id:newId(),origin:'local',number:'C-'+formatOrderNumber(outlet.orderSeq),idempotencyKey:key,source:'walkin',outletId:outlet._id,name:data.name||(takeaway?'Takeaway customer':'Walk-in customer'),mobile:data.mobile,address:'',area:'',fulfilment:takeaway?'pickup':'dine_in',tableName:takeaway?'':'Eat here',scheduledAt:now,items:lines,requirements:needs,subtotal,deliveryFee:0,total:billing.total,billing,cancellationPercent:outlet.cancellationPercent,status:'confirmed',paymentStatus:paid?'paid':'due',paymentId:paid?'walkin_'+data.paymentMethod:null,paymentMethod:data.paymentMethod,paidAt:paid?now:null,collectedBy:paid?user.email:null,confirmedAt:now,inventoryState:'reserved',slotReleased:true,preview:false,history:[{status:'confirmed',at:now}],createdAt:now});
+  return s.saveOrder({_id:newId(),origin:'local',number:'C-'+formatOrderNumber(outlet.orderSeq),idempotencyKey:key,source:'walkin',outletId:outlet._id,name:data.name||(takeaway?'Takeaway customer':'Walk-in customer'),mobile:data.mobile,address:'',area:'',fulfilment:takeaway?'pickup':'dine_in',tableName:takeaway?'':'Eat here',scheduledAt:now,items:lines,requirements:needs,subtotal,deliveryFee:0,total:billing.total,billing,cancellationPercent:outlet.cancellationPercent,status:'confirmed',paymentStatus:paid?'paid':'due',paymentId:paid?'walkin_'+data.paymentMethod:null,paymentMethod:data.paymentMethod,paidAt:paid?now:null,collectedBy:paid?user.email:null,confirmedAt:now,inventoryState:'released',slotReleased:true,preview:false,history:[{status:'confirmed',at:now}],createdAt:now});
  });
 }
 export function advanceOrder(s,orderId,next,user){return s.tx(()=>{

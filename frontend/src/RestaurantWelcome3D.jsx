@@ -1,8 +1,9 @@
 import {useEffect,useRef,useState} from 'react';
+import {FullscreenButton} from './components/ui';
 import './restaurant-welcome.css';
 
 export default function RestaurantWelcome({order=null,tableName,disabled=false,loading=false,onOrder}){
- const stage=useRef(null),section=useRef(null),engine=useRef(null);
+ const stage=useRef(null),engine=useRef(null);
  const [status,setStatus]=useState('loading'),[error,setError]=useState(''),[finished,setFinished]=useState(false),[retry,setRetry]=useState(0);
  const [paused,setPaused]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const [voice,setVoice]=useState(()=>{try{return sessionStorage.getItem('rh-host-voice')==='on'}catch{return false}});
@@ -17,11 +18,10 @@ export default function RestaurantWelcome({order=null,tableName,disabled=false,l
  const message=order?`Thank you! Order ${order.number} is confirmed. I’m taking your order to the kitchen. Good food is cooking!`:'Welcome to Red Handi! Good food is cooking. What would you like to order?';
  useEffect(()=>{if(!voice||!canSpeak||status!=='ready')return;const utterance=new SpeechSynthesisUtterance(message);utterance.lang='en-IN';utterance.rate=.93;window.speechSynthesis.cancel();window.speechSynthesis.speak(utterance);return()=>window.speechSynthesis.cancel()},[voice,message,status,canSpeak]);
  function toggleVoice(){setVoice(v=>{try{sessionStorage.setItem('rh-host-voice',v?'off':'on')}catch{}return !v})}
- async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else await section.current.requestFullscreen()}catch{setError('Full-screen mode isn’t available in this browser. The scene already fills the page.')}}
  function showBill(){document.getElementById('inperson-bill')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})}
- return <section ref={section} className={'rh-cinema '+(order?'rh-cinema-order':'')} aria-label={order?'Your host carries the order to the kitchen':'Welcome to the 3D Red Handi restaurant'}>
+ return <section className={'rh-cinema '+(order?'rh-cinema-order':'')} aria-label={order?'Your host carries the order to the kitchen':'Welcome to the 3D Red Handi restaurant'}>
   <div className='rh-cinema-poster' aria-hidden='true'/><div ref={stage} className='rh-cinema-stage' data-scene-status={status}/><div className='rh-cinema-shade' aria-hidden='true'/>
-  <header className='rh-cinema-top'><a href='/' className='rh-cinema-brand'><img src='/logo.png' alt='Red Handi'/><span>REDHANDI<small>GOOD FOOD. GOOD MOOD.</small></span></a><div className='rh-cinema-tools'>{canSpeak&&<button aria-pressed={voice} onClick={toggleVoice}>{voice?'Sound on':'Sound off'}</button>}<button onClick={()=>setPaused(v=>!v)} aria-pressed={paused}>{paused?'Play animation':'Pause animation'}</button>{document.fullscreenEnabled&&<button onClick={fullscreen} aria-label='Toggle full screen'>⛶</button>}</div></header>
+  <header className='rh-cinema-top'><a href='/' className='rh-cinema-brand'><img src='/logo.png' alt='Red Handi'/><span>REDHANDI<small>GOOD FOOD. GOOD MOOD.</small></span></a><div className='rh-cinema-tools'>{canSpeak&&<button aria-pressed={voice} onClick={toggleVoice}>{voice?'Sound on':'Sound off'}</button>}<button onClick={()=>setPaused(v=>!v)} aria-pressed={paused}>{paused?'Play animation':'Pause animation'}</button><FullscreenButton/></div></header>
   <div className='rh-cinema-title'><span className='rh-cinema-eyebrow'>{tableName||order?.tableName||'WELCOME TO OUR KITCHEN'}</span><h1>{order?<>Good food<br/>is <em>on its way.</em></>:<>A little spice.<br/>A lot of <em>heart.</em></>}</h1><p>{order?`Order #${order.number} · ${finished?'Received by our kitchen':'Your host is taking it from here'}`:'Your favourites. Fresh from the handi.'}</p></div>
   {status==='loading'&&<div className='rh-scene-loading' role='status'><span/>Opening the kitchen…</div>}
   {error&&<div className='rh-scene-error' role='status'>{error}{status==='error'&&<button onClick={()=>setRetry(n=>n+1)}>Retry animation</button>}</div>}

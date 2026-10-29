@@ -10,3 +10,4 @@
 @media(max-width:600px){.rh-film .rh-cinema-title{top:95px;left:6%;max-width:210px}.rh-film .rh-cinema-title h1{font-size:25px;letter-spacing:-.6px;margin:8px 0}.rh-film .rh-cinema-title>p{display:none}.rh-film .rh-host-caption>p{font-size:21px}.rh-film .rh-cinema-title h1{max-width:170px}}
 
 .rh-bill-button{display:block;width:100%;margin-top:10px;padding:12px 18px;border:1px solid #f4d69e70;border-radius:10px;background:#24161066;color:#fff6e5;cursor:pointer;font-weight:600}.rh-bill-button:hover{background:#513121aa}.rh-cinema-action>.rh-return-countdown{font-size:11px;color:#f4dfbe}.rh-thank-you .rh-film-video{object-position:60% center}
+.rh-cinema-tools .fullscreen-button{background:#20191166;border:1px solid #fff4df40;border-radius:100px;color:#fff4df;padding:11px 15px}

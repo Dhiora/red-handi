@@ -31,3 +31,4 @@
 .stage-button.to-completed{background:#30221c}.stage-button.to-completed:hover:not(:disabled){background:#1a120e}
 .order-kind-break .new{color:#b45309}.order-kind-break .prep{color:#1d4ed8}.order-kind-break .ready{color:#15803d}
 .order-kinds button.has-new .order-kind-break{font-weight:600}
+.ip-header-tools{display:flex;align-items:center;gap:12px}.ip-header-tools>span{font-size:13px}@media(max-width:500px){.ip-header-tools>span{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}

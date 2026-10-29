@@ -27,7 +27,8 @@ red-handi/
 ```bash
 npm run install:all          # installs backend and frontend dependencies
 cp backend/.env.example backend/.env   # optional; without MONGODB_URI a local MongoDB is started in dev
-npm run dev                  # frontend on http://127.0.0.1:5173, API on http://127.0.0.1:4000
+npm run dev                  # this computer only: http://127.0.0.1:5173
+npm run global               # every device on this Wi-Fi, at the address printed on startup
 ```
 
 Run only the frontend with `FRONTEND_ONLY=true npm run dev`.
@@ -36,7 +37,8 @@ Run only the frontend with `FRONTEND_ONLY=true npm run dev`.
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Starts frontend and backend in watch mode |
+| `npm run dev` | Starts frontend and backend on this computer only |
+| `npm run global` | Same servers, reachable by other devices on this Wi-Fi |
 | `npm run build` | Builds the frontend into `frontend/dist` |
 | `npm start` | Starts the backend in production mode and serves `frontend/dist` |
 | `npm test` | Runs backend and frontend tests (integration tests need MongoDB on port 27018) |

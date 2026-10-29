@@ -5,6 +5,7 @@ import {LogOut,Bell,BellOff,RefreshCw,Package,PackageCheck,Clock,Check} from 'lu
 import {toast} from 'sonner';
 import BrandLoader from './components/feedback/BrandLoader';
 import {api,formatTime,formatDate,localDate} from './api';
+import {FullscreenButton} from './components/ui';
 import {Login} from './Admin';
 const where=o=>o.tableName||({pickup:'Pickup',delivery:'Delivery'+(o.area?' · '+o.area:''),dine_in:'Dine in'})[o.fulfilment]||'Counter';
 const due=o=>localDate(o.scheduledAt)===localDate(Date.now())?formatTime(o.scheduledAt):formatDate(o.scheduledAt)+' · '+formatTime(o.scheduledAt);
@@ -37,7 +38,7 @@ export default function Staff(){
   {packing&&<button className='button full staff-ready' disabled={!!busy} onClick={()=>move(o,'ready')}><PackageCheck size={18}/> {busy===o._id?'Saving…':done===o.items.length?'Packed · mark ready':`Mark ready (${done}/${o.items.length} ticked)`}</button>}
   </article>};
  const section=(status,title,empty)=>{const list=group(status);return <section className='staff-section'><h2>{title} <span>{list.length}</span></h2>{list.length?list.map(card):<p className='staff-empty'>{empty}</p>}</section>};
- return <div className='staff-app'><header className='staff-top'><div><img src='/logo.png' alt='RedHandi'/><div><strong>{data?.outlet?.name||'RedHandi'}</strong><small>{user.name}</small></div></div><div className='staff-actions'><button className={'icon-button'+(sound?' on':'')} aria-label={sound?'Turn off sound alerts':'Turn on sound alerts'} onClick={toggleSound}>{sound?<Bell size={20}/>:<BellOff size={20}/>}</button><button className='icon-button' aria-label='Refresh orders' onClick={load}><RefreshCw size={20}/></button><button className='icon-button' aria-label='Sign out' onClick={logout}><LogOut size={20}/></button></div></header>
+ return <div className='staff-app'><header className='staff-top'><div><img src='/logo.png' alt='RedHandi'/><div><strong>{data?.outlet?.name||'RedHandi'}</strong><small>{user.name}</small></div></div><div className='staff-actions'><FullscreenButton className='icon-button'/><button className={'icon-button'+(sound?' on':'')} aria-label={sound?'Turn off sound alerts':'Turn on sound alerts'} onClick={toggleSound}>{sound?<Bell size={20}/>:<BellOff size={20}/>}</button><button className='icon-button' aria-label='Refresh orders' onClick={load}><RefreshCw size={20}/></button><button className='icon-button' aria-label='Sign out' onClick={logout}><LogOut size={20}/></button></div></header>
  {!sound&&<button className='staff-sound-banner' onClick={toggleSound}><Bell size={18}/> Tap to turn on sound alerts for new orders</button>}
  {error&&<div className='error-banner' role='alert'>{error}<button onClick={load}>Retry</button></div>}
  {!data?<div className='empty-state'><RefreshCw className='spin'/><p>Loading orders…</p></div>:<main>{section('confirmed','New orders','No new orders. New ones appear here automatically.')}{section('preparing','Preparing now','Tap “Start preparing” on a new order.')}{section('ready','Ready',"Packed orders waiting to be served or collected.")}</main>}
