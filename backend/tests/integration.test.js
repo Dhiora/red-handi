@@ -6,12 +6,13 @@ import request from 'supertest';
 import bcrypt from 'bcryptjs';
 import {app} from '../src/app.js';
 import {seed} from '../src/seed.js';
-import {Order,Outlet,MenuItem,Ingredient,User,Restaurant,Slot,StockMovement,Session} from '../src/models.js';
+import {Order,Outlet,MenuItem,Ingredient,User,Restaurant,Slot,StockMovement,Session,Employee,Expense} from '../src/models.js';
+import {periodRange,dayKey} from '../src/business.js';
 import {createOrder,cancelOrder,advanceOrder,confirmPayment,expireOrder} from '../src/orders.js';
 import {getSlots} from '../src/policy.js';
 let outlet,item,owner,agent,token;const db='redhandi_test_'+crypto.randomBytes(6).toString('hex');
 function payload(extra={}){return {outletId:outlet.id,name:'Test Customer',mobile:'9000000000',fulfilment:'pickup',address:'',area:'',scheduledAt:getSlots(outlet)[0],items:[{id:item.id,quantity:1}],idempotencyKey:crypto.randomUUID(),accessToken:crypto.randomBytes(32).toString('hex'),preview:true,...extra}}
-before(async()=>{process.env.NODE_ENV='test';process.env.PREVIEW_CHECKOUT='true';process.env.BOOTSTRAP_PASSWORD='test-only-password-123';process.env.SUPER_ADMIN_EMAIL='admin@redhandi.com';await mongoose.connect(`mongodb://127.0.0.1:27018/${db}?replicaSet=rs0`);await Promise.all([Order,Outlet,MenuItem,Ingredient,User,Restaurant,Slot,StockMovement,Session].map(m=>m.init()));await seed();outlet=await Outlet.findOne();item=await MenuItem.findOne({name:'Chicken Dum Biryani'});owner=await User.findOne({role:'super_admin'}).lean();agent=request.agent(app);const login=await agent.post('/api/auth/login').set('X-RH-Request','1').send({email:'admin@redhandi.com',password:'test-only-password-123'});assert.equal(login.status,200)});
+before(async()=>{process.env.NODE_ENV='test';process.env.PREVIEW_CHECKOUT='true';process.env.BOOTSTRAP_PASSWORD='test-only-password-123';process.env.SUPER_ADMIN_EMAIL='admin@redhandi.com';await mongoose.connect(process.env.TEST_MONGODB_URI||'mongodb://127.0.0.1:27018/?replicaSet=rs0',{dbName:db});await Promise.all([Order,Outlet,MenuItem,Ingredient,User,Restaurant,Slot,StockMovement,Session,Employee,Expense].map(m=>m.init()));await seed();outlet=await Outlet.findOne();item=await MenuItem.findOne({name:'Chicken Dum Biryani'});owner=await User.findOne({role:'super_admin'}).lean();agent=request.agent(app);const login=await agent.post('/api/auth/login').set('X-RH-Request','1').send({email:'admin@redhandi.com',password:'test-only-password-123'});assert.equal(login.status,200)});
 after(async()=>{await mongoose.connection.dropDatabase();await mongoose.disconnect()});
 test('public menu keeps unavailable items visible and hides recipes',async()=>{const res=await request(app).get('/api/menu');assert.equal(res.status,200);assert.ok(res.body.items.some(i=>i.available===false));assert.equal('recipe' in res.body.items[0],false);assert.equal(res.body.outlet.deliveryEnabled,false)});
 test('unauthenticated admin access and CSRF-like mutations are denied',async()=>{assert.equal((await request(app).get('/api/admin/data')).status,401);assert.equal((await agent.patch('/api/admin/outlets/'+outlet.id).send({deliveryEnabled:true})).status,403)});
@@ -58,4 +59,48 @@ test('table management requires login and invalid QR tokens cannot place orders'
  assert.equal((await request(app).post('/api/admin/tables').set('X-RH-Request','1').send({outletId:outlet.id,name:'Denied'})).status,401);
  const body={outletId:outlet.id,mobile:'9000000000',tableToken:'a'.repeat(48),items:[{id:item.id,quantity:1}],idempotencyKey:crypto.randomUUID(),accessToken:crypto.randomBytes(32).toString('hex')};
  assert.equal((await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send(body)).status,404);
+});
+test('IST periods cover whole days, months and years and reject invalid dates',()=>{const day=periodRange('2026-03-31');assert.equal(day.start.toISOString(),'2026-03-30T18:30:00.000Z');assert.equal(day.end.toISOString(),'2026-03-31T18:30:00.000Z');assert.equal(periodRange('2026-12').end.toISOString(),'2026-12-31T18:30:00.000Z');assert.equal(periodRange('2026').unit,'year');assert.throws(()=>periodRange('2026-02-30'),/valid day/);assert.throws(()=>periodRange('yesterday'),/valid day/)});
+test('sales report counts real paid orders, expenses and salary into profit',async()=>{const today=dayKey(new Date()),month=today.slice(0,7);const report=async()=>(await agent.get(`/api/admin/reports?outlet=${outlet.id}&period=${month}`)).body;const before=await report();
+ const walkIn=await agent.post('/api/admin/orders/walk-in').set('X-RH-Request','1').send({outletId:outlet.id,items:[{id:item.id,quantity:2}]});assert.equal(walkIn.status,200);
+ const preview=await createOrder(payload());
+ assert.equal((await agent.post('/api/admin/expenses').set('X-RH-Request','1').send({outletId:outlet.id,day:today,category:'Rent',amount:500000,note:'Test rent'})).status,200);
+ const employee=await agent.post('/api/admin/employees').set('X-RH-Request','1').send({outletId:outlet.id,name:'Report Cook',mobile:'',role:'Cook',monthlySalary:1500000,joinedOn:'',active:true,appAccess:false,password:''});assert.equal(employee.status,200);
+ assert.equal((await agent.post('/api/admin/employees/'+employee.body._id+'/salary').set('X-RH-Request','1').send({month,day:today,amount:700000})).status,200);
+ const after=await report(),row=after.rows.find(r=>r.key===today);assert.ok(row);
+ assert.equal(after.totals.sales-before.totals.sales,item.price*2);assert.equal(after.totals.expenses-before.totals.expenses,500000);assert.equal(after.totals.salary-before.totals.salary,700000);assert.equal(after.totals.profit-before.totals.profit,item.price*2-1200000);assert.equal(row.profit,row.sales-row.expenses-row.salary);
+ const list=await agent.get(`/api/admin/employees?outlet=${outlet.id}&month=${month}`);assert.equal(list.body.employees.find(e=>e._id===employee.body._id).paid,700000);
+ const history=await agent.get(`/api/admin/orders/history?outlet=${outlet.id}&period=${today}`);assert.ok(history.body.orders.some(o=>o._id===walkIn.body.order._id));assert.equal((await agent.get(`/api/admin/orders/history?outlet=${outlet.id}&period=2026`)).status,400);
+ const rent=after.expenses.find(e=>e.note==='Test rent');assert.equal((await agent.delete('/api/admin/expenses/'+rent._id).set('X-RH-Request','1')).status,200);await cancelOrder(preview.order._id,0)});
+test('staff sign in with their mobile, see only packing orders and cannot open the admin',async()=>{const created=await agent.post('/api/admin/employees').set('X-RH-Request','1').send({outletId:outlet.id,name:'Packing Ravi',mobile:'9123456789',role:'Packing',monthlySalary:1200000,joinedOn:'',active:true,appAccess:true,password:'packing-pass'});assert.equal(created.status,200);
+ const staff=request.agent(app);const login=await staff.post('/api/auth/login').set('X-RH-Request','1').send({email:'9123456789',password:'packing-pass'});assert.equal(login.status,200);assert.equal(login.body.user.role,'staff');
+ assert.equal((await staff.get('/api/admin/data')).status,403);assert.equal((await staff.get(`/api/admin/reports?outlet=${outlet.id}&period=2026`)).status,403);
+ const result=await createOrder(payload());const queue=await staff.get('/api/staff/orders');assert.equal(queue.status,200);const mine=queue.body.orders.find(o=>o._id===String(result.order._id));assert.ok(mine);assert.equal('mobile' in mine,false);
+ assert.equal((await staff.patch('/api/staff/orders/'+result.order._id+'/status').set('X-RH-Request','1').send({status:'preparing'})).status,200);assert.equal((await staff.patch('/api/staff/orders/'+result.order._id+'/status').set('X-RH-Request','1').send({status:'completed'})).status,400);assert.equal((await staff.patch('/api/staff/orders/'+result.order._id+'/status').set('X-RH-Request','1').send({status:'ready'})).status,200);
+ assert.equal((await agent.patch('/api/admin/employees/'+created.body._id).set('X-RH-Request','1').send({active:false})).status,200);assert.equal((await staff.get('/api/staff/orders')).status,401);
+ assert.equal((await staff.post('/api/auth/login').set('X-RH-Request','1').send({email:'9123456789',password:'packing-pass'})).status,401)});
+
+test('GST settings validate, quote on the server and remain fixed on saved bills',async()=>{
+ const patch=body=>agent.patch('/api/admin/outlets/'+outlet.id).set('X-RH-Request','1').send(body);
+ assert.equal((await patch({gstEnabled:true,gstRate:5,gstin:''})).status,400);
+ assert.equal((await patch({gstEnabled:true,gstRate:5,gstin:'36ABCDE1234F1Z5',pricesIncludeGst:false})).status,200);
+ const body={outletId:outlet.id,mobile:'9000000000',items:[{id:item.id,quantity:1}],idempotencyKey:crypto.randomUUID(),accessToken:crypto.randomBytes(32).toString('hex')};
+ const result=await request(app).post('/api/inperson/orders').set('X-RH-Request','1').send(body);assert.equal(result.status,200);
+ const billed=result.body.order;assert.equal(billed.total,item.price+Math.round(item.price*.05));assert.equal(billed.billing.gstin,'36ABCDE1234F1Z5');
+ await patch({gstEnabled:false,gstRate:18});const old=await Order.findById(billed._id);assert.equal(old.billing.gstRate,5);assert.equal(old.total,billed.total);await cancelOrder(old.id,0);
+});
+test('concurrent walk-in retries bill once and reserve stock until preparation',async()=>{
+ const before=await Ingredient.findById(item.recipe[0].ingredientId);const key=crypto.randomUUID();const body={outletId:outlet.id,idempotencyKey:key,paymentMethod:'due',items:[{id:item.id,quantity:1}]};
+ const send=()=>agent.post('/api/admin/orders/walk-in').set('X-RH-Request','1').send(body);
+ const [a,b]=await Promise.all([send(),send()]);assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(a.body.order._id,b.body.order._id);assert.equal(a.body.order.paymentStatus,'due');
+ const after=await Ingredient.findById(before.id);assert.equal(after.stock,before.stock);assert.equal(Math.round((after.reserved-before.reserved)*1e6),Math.round(item.recipe[0].quantity*1e6));
+ const collect=()=>agent.post('/api/admin/orders/'+a.body.order._id+'/collect').set('X-RH-Request','1').send({method:'upi'});
+ const [first,second]=await Promise.all([collect(),collect()]);assert.equal(first.status,200);assert.equal(second.status,200);const order=await Order.findById(a.body.order._id);assert.equal(order.paymentMethod,'upi');assert.ok(order.paidAt);assert.equal(order.collectedBy,owner.email);
+ await advanceOrder(order.id,'preparing',owner);const consumed=await Ingredient.findById(before.id);assert.equal(consumed.stock,before.stock-item.recipe[0].quantity);
+});
+test('reports provide rolling chart series, tax totals and full-day dashboard counts',async()=>{
+ const response=await agent.get('/api/admin/reports?outlet='+outlet.id+'&range=sixmonths');assert.equal(response.status,200);assert.equal(response.body.rows.length,6);
+ const daily=await agent.get('/api/admin/reports?outlet='+outlet.id+'&range=month');assert.equal(daily.body.rows.length,30);
+ const dashboard=await agent.get('/api/admin/data?outlet='+outlet.id);assert.equal(dashboard.status,200);assert.ok(dashboard.body.summary.orders>0);assert.ok(Number.isFinite(dashboard.body.summary.tax));
+ const readiness=await agent.get('/api/admin/readiness?outlet='+outlet.id);assert.equal(readiness.status,200);assert.equal(readiness.body.ready,false);assert.ok(readiness.body.checks.find(c=>c.name==='Transactional database').ok);
 });

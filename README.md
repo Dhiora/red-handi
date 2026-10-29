@@ -39,7 +39,7 @@ Run only the frontend with `FRONTEND_ONLY=true npm run dev`.
 | `npm run dev` | Starts frontend and backend in watch mode |
 | `npm run build` | Builds the frontend into `frontend/dist` |
 | `npm start` | Starts the backend in production mode and serves `frontend/dist` |
-| `npm test` | Runs backend tests (integration tests need MongoDB on port 27018) |
+| `npm test` | Runs backend and frontend tests (integration tests need MongoDB on port 27018) |
 | `npm run setup-admin` | Sets the super admin password |
 
 Each folder can also be run on its own (`cd frontend && npm run dev`, `cd backend && npm run dev`).
@@ -61,4 +61,12 @@ In `/admin`, open **Restaurant layout**, add named tables, and download each tab
 
 The Orders queue includes all active orders, oldest first, plus the latest 250 closed orders. Staff move table orders through Start preparing → Mark ready → Mark served and record payment using **Collect** after receiving it. Table orders and direct in-person orders share the existing numbering and stock system. The admin refreshes every 12 seconds. Paid restaurant-order cancellations must be handled by the restaurant; they do not trigger Razorpay refunds.
 
-The `/inperson` introduction is a full-screen Three.js cartoon, modeled and animated in Blender. It uses the supplied Red Handi blueprint as a style reference: red polo/cap, black apron, bearded chef and warm restaurant interior. After server confirmation, the host carries the numbered order slip to the kitchen. The editable Blender source and rebuild instructions are in `art/restaurant/`. The scene supports pause, opt-in voice, reduced motion, and a poster fallback.
+The `/inperson` introduction uses full-screen AI-generated welcome and thank-you artwork. A silent video player is ready for generated clips; video generation remains pending. No live Blender rendering is loaded by this page. After confirmation, guests can start a new order, view their bill, or return automatically after 10 seconds of inactivity.
+
+## Restaurant management release
+
+See [the launch handover](docs/LAUNCH.md) for owner workflows, optional GST, deployment steps, verification and outstanding production checks. The admin now includes rolling 30-day and six-month sales charts, payment-method recording, printable kitchen tickets, retry-safe counter billing, expense/salary tracking, shared request state and a launch checklist.
+
+GST is off by default. Enable it in Kitchen settings only after entering your registration and applicable rate. Existing bills retain their original prices and tax details.
+
+Run `npm run test:ci` to start a disposable test database, test both applications and build the website. A Dockerfile and CI workflow are included.

@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/dist
+**/.env*
+**/.data
+**/*.log
+art
+frontend/public/models
+frontend/public/cinema/*.blend

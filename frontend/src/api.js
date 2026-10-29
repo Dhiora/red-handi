@@ -1,5 +1,5 @@
 export async function api(path,{method='GET',body,token,...options}={}){
- const response=await fetch('/api'+path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json','X-RH-Request':'1',...(token?{'X-Order-Token':token}:{})},...(body?{body:JSON.stringify(body)}:{}),...options});
+ const response=await fetch('/api'+path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json','X-RH-Request':'1',...(token?{'X-Order-Token':token}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:options.signal||AbortSignal.timeout(20000),...options});
  let data;try{data=await response.json()}catch{throw new Error('The kitchen connection is unavailable. Please try again.')}
  if(!response.ok)throw Object.assign(new Error(data.error||'Something went wrong.'),{status:response.status});return data;
 }
@@ -11,9 +11,11 @@ export function saveOrder(order,token){try{const old=JSON.parse(localStorage.get
 export function recentOrders(){try{return JSON.parse(localStorage.getItem('rh-orders')||'[]')}catch{return []}}
 export async function loadRazorpay(){if(window.Razorpay)return;await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://checkout.razorpay.com/v1/checkout.js';s.onload=resolve;s.onerror=()=>reject(new Error('Could not load secure checkout. Please check your connection.'));document.head.appendChild(s)})}
 const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function printBill(order,outlet){
+export function printBill(order,outlet,printWindow=null){
+ outlet=order.billing||outlet;
+ const tax=order.billing;
  const rows=order.items.map(i=>`<tr><td>${escapeHtml(i.name)}</td><td class='num'>${i.quantity}</td><td class='num'>${money(i.unitPrice)}</td><td class='num'>${money(i.unitPrice*i.quantity)}</td></tr>`).join('');
- const paymentLine=order.preview?'Preview order · not charged':order.paymentStatus==='paid'?(order.paymentId==='walkin_cash'||order.paymentId==='restaurant_cash'?'Paid at restaurant':'Paid online'):'Payment due at restaurant';
+ const paymentLine=order.preview?'Preview order · not charged':order.paymentStatus==='paid'?(['inperson','walkin'].includes(order.source)||order.paymentId==='walkin_cash'||order.paymentId==='restaurant_cash'?'Paid at restaurant'+(order.paymentMethod?' · '+order.paymentMethod.toUpperCase():''):'Paid online'):'Payment due at restaurant';
  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Bill ${escapeHtml(order.number)}</title><style>
   *{box-sizing:border-box}body{font-family:'Courier New',monospace;color:#111;margin:0;padding:16px;width:320px}
   .center{text-align:center}.logo{width:56px;height:56px;object-fit:contain;margin:0 auto 6px}
@@ -30,6 +32,7 @@ export function printBill(order,outlet){
   <p class="muted">${escapeHtml(outlet?.name||'')}</p>
   <p class="muted">${escapeHtml(outlet?.address||'')}</p>
   ${outlet?.phone?`<p class="muted">${escapeHtml(outlet.phone)}</p>`:''}</div>
+  ${tax?.gstEnabled?`<p class="muted center">GSTIN: ${escapeHtml(tax.gstin)}</p>`:''}
   <hr/>
   <p class="muted">Order <strong>${escapeHtml(order.number)}</strong></p>
   <p class="muted">${escapeHtml(formatDate(order.scheduledAt))} · ${escapeHtml(formatTime(order.scheduledAt))}</p>
@@ -40,13 +43,19 @@ export function printBill(order,outlet){
   <div class="totals">
    <div><span>Subtotal</span><span>${money(order.subtotal)}</span></div>
    ${order.deliveryFee>0?`<div><span>Delivery fee</span><span>${money(order.deliveryFee)}</span></div>`:''}
+   ${tax?.gstEnabled?`<div><span>Taxable amount</span><span>${money(tax.taxableAmount)}</span></div><div><span>CGST ${tax.gstRate/2}%${tax.pricesIncludeGst?' (included)':''}</span><span>${money(tax.cgst)}</span></div><div><span>SGST ${tax.gstRate/2}%${tax.pricesIncludeGst?' (included)':''}</span><span>${money(tax.sgst)}</span></div>`:''}
    <div class="grand"><span>Total</span><span>${money(order.total)}</span></div>
   </div>
   <p class="muted center">${escapeHtml(paymentLine)}</p>
   <p class="thanks">Thank you for ordering with RedHandi!</p>
   <script>window.onload=function(){window.print()}</script>
  </body></html>`;
- const w=window.open('','_blank','width=380,height=640');
+ const w=printWindow||window.open('','_blank','width=380,height=640');
  if(!w){throw new Error('Please allow pop-ups to print the bill.')}
  w.document.open();w.document.write(html);w.document.close();
+}
+
+export function printKitchenTicket(order,outlet){
+ const w=window.open('','_blank','width=380,height=640');if(!w)throw new Error('Please allow pop-ups to print the kitchen ticket.');
+ w.document.open();w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Kitchen ${escapeHtml(order.number)}</title><style>body{font:16px monospace;margin:16px;max-width:320px}h1{font-size:25px}li{padding:12px 0;border-bottom:1px dashed}ul{padding:0;list-style:none}@media print{body{width:auto}}</style></head><body><p>${escapeHtml(order.billing?.name||outlet?.name||'RedHandi')} · KITCHEN</p><h1>#${escapeHtml(order.number)}</h1><strong>${escapeHtml(order.tableName||order.fulfilment)}</strong><p>${escapeHtml(formatTime(order.createdAt))} · ${escapeHtml(order.name)}</p><ul>${order.items.map(i=>`<li><b>${i.quantity} ×</b> ${escapeHtml(i.name)}</li>`).join('')}</ul><p>${escapeHtml(order.status)}</p><script>window.onload=()=>window.print()</script></body></html>`);w.document.close();
 }
