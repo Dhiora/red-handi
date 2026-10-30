@@ -1,3 +1,6 @@
+const staffJobs=['kitchen','counter','service'];
+export function staffDuties(record){const raw=Array.isArray(record?.duties)&&record.duties.length?record.duties:record?.duty?[record.duty]:['kitchen'];const list=[];for(const duty of raw)if(staffJobs.includes(duty)&&!list.includes(duty))list.push(duty);return list.length?list:['kitchen']}
+export function accountDuties(user){return user?.role==='staff'?staffDuties(user):['kitchen']}
 export class HttpError extends Error{constructor(status,message){super(message);this.status=status}}
 export const fail=(status,message)=>{throw new HttpError(status,message)};
 export const rupees=value=>Math.round(Number(value)*100);

@@ -43,6 +43,7 @@ Run only the frontend with `FRONTEND_ONLY=true npm run dev`.
 | `npm start` | Starts the backend in production mode and serves `frontend/dist` |
 | `npm test` | Runs backend and frontend tests (integration tests need MongoDB on port 27018) |
 | `npm run setup-admin` | Sets the super admin password |
+| `npm run clear -- --all` | Clears local orders, sales, employees, and the menu. Admin login and kitchen settings stay |
 
 Each folder can also be run on its own (`cd frontend && npm run dev`, `cd backend && npm run dev`).
 Set `FRONTEND_DIST` on the backend to serve the built frontend from a different path.

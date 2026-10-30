@@ -11,6 +11,7 @@
     "start": "npm start --prefix backend",
     "test": "npm test --prefix backend && npm test --prefix frontend",
     "setup-admin": "npm run setup-admin --prefix backend",
+    "clear": "node backend/scripts/clear.mjs",
     "test:ci": "node scripts/test-ci.mjs"
   }
 }

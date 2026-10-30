@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import {z} from 'zod';
-import {fail,canTransition,formatOrderNumber,cancellationQuote} from '../policy.js';
+import {fail,canTransition,formatOrderNumber,cancellationQuote,staffDuties} from '../policy.js';
 import {billingSnapshot} from '../../../shared/billing.js';
 import {reportRange,periodRange,assembleReport,dayKey,expenseCategories} from '../business.js';
 import {id} from '../schemas.js';
@@ -90,7 +90,7 @@ export function addExpense(s,data,actor){const expense={id:newId(),...data,emplo
 export {expenseCategories};
 // Users: the owner (admin) and employees with packing-app access (staff), who sign in with their mobile number.
 export function findUser(s,where,...params){return s.db.prepare(`select * from users where ${where}`).get(...params)}
-export function publicUser(s,u){return u&&{_id:u.id,id:u.id,email:u.email,name:u.name,role:u.role,outletId:outletOf(s)?._id,active:!!u.active}}
+export function publicUser(s,u){if(!u)return null;const duties=u.role==='staff'?staffDuties(s.all('employee').find(e=>String(e.userId)===String(u.id))||{}):undefined;return {_id:u.id,id:u.id,email:u.email,name:u.name,role:u.role,duty:duties?.[0],duties,outletId:outletOf(s)?._id,active:!!u.active}}
 export async function setUser(s,{id:userId=newId(),email,name,role,password,passwordHash,active=true}){
  const now=nowIso(),hashValue=passwordHash||(password?await bcrypt.hash(password,12):null);
  const old=findUser(s,'id=?',userId);if(!old&&!hashValue)fail(400,'A password is required.');

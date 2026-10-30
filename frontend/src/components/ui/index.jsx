@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
-import {Dialog as D,AlertDialog as A,Select as S,Switch as W,Tabs as T,Checkbox as C} from 'radix-ui';
-import {X,ChevronDown,Check,Maximize,Minimize} from 'lucide-react';
+import {Dialog as D,AlertDialog as A,Select as S,Switch as W,Tabs as T,Checkbox as C,DropdownMenu as M} from 'radix-ui';
+import {X,ChevronDown,Check,Maximize,Minimize,MoreHorizontal} from 'lucide-react';
 export function FullscreenButton({className=''}){
  const [on,setOn]=useState(()=>!!document.fullscreenElement);
  useEffect(()=>{const sync=()=>setOn(!!(document.fullscreenElement||document.webkitFullscreenElement));document.addEventListener('fullscreenchange',sync);document.addEventListener('webkitfullscreenchange',sync);return()=>{document.removeEventListener('fullscreenchange',sync);document.removeEventListener('webkitfullscreenchange',sync)}},[]);
@@ -16,3 +16,4 @@ export function Toggle({checked,onCheckedChange,label,disabled}){return <W.Root 
 export function Checkbox({checked,onCheckedChange,label}){return <label className='checkbox-label'><C.Root checked={checked} onCheckedChange={onCheckedChange} className='checkbox'><C.Indicator><Check size={13}/></C.Indicator></C.Root><span>{label}</span></label>}
 export function Tabs({value,onValueChange,items}){return <T.Root value={value} onValueChange={onValueChange}><T.List className='category-row' aria-label='Menu category'>{items.map(item=><T.Trigger className={value===item?'active':''} key={item} value={item}>{item}</T.Trigger>)}</T.List></T.Root>}
 export function Field({label,children,hint,...props}){return <label className='field'><span>{label}</span>{children||<input {...props}/>} {hint&&<small>{hint}</small>}</label>}
+export function RowMenu({label,items}){return <M.Root><M.Trigger className='icon-button' aria-label={label}><MoreHorizontal size={18}/></M.Trigger><M.Portal><M.Content className='row-menu' align='end' sideOffset={6}>{items.map(item=><M.Item key={item.label} className={'row-menu-item'+(item.danger?' danger':'')} onSelect={item.onSelect}>{item.label}</M.Item>)}</M.Content></M.Portal></M.Root>}

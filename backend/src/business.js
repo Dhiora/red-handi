@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import {z} from 'zod';
 import {Order,Employee,Expense,User,Session} from './models.js';
-import {fail} from './policy.js';
+import {fail,staffDuties} from './policy.js';
 import {publicOrder} from './orders.js';
 export const expenseCategories=['Ingredients','Packaging','Rent','Electricity & gas','Salary','Maintenance','Marketing','Other'];
 const IST=330*60000;
@@ -55,7 +55,7 @@ export function assembleReport({period,range,start,end,unit,startDay,endDay},sal
 const mobile=z.string().regex(/^[6-9]\d{9}$/,'Enter a 10-digit mobile number.');
 const month=z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>{try{return periodRange(v).unit==='day'}catch{return false}},'Choose a valid date.');
-const employeeFields={name:z.string().trim().min(2).max(80),mobile:mobile.or(z.literal('')),role:z.string().trim().max(40),monthlySalary:z.number().int().min(0).max(100000000),joinedOn:day.or(z.literal('')),active:z.boolean(),appAccess:z.boolean(),password:z.string().min(8).max(128).or(z.literal(''))};
+const employeeFields={name:z.string().trim().min(2).max(80),mobile:mobile.or(z.literal('')),role:z.string().trim().max(40),duty:z.enum(['kitchen','counter','service']).optional(),duties:z.array(z.enum(['kitchen','counter','service'])).min(1).optional(),monthlySalary:z.number().int().min(0).max(100000000),joinedOn:day.or(z.literal('')),active:z.boolean(),appAccess:z.boolean(),password:z.string().min(8).max(128).or(z.literal(''))};
 export const employeeSchema=z.object(employeeFields);
 export const expenseSchema=z.object({day,category:z.enum(expenseCategories),amount:z.number().int().min(1).max(100000000),note:z.string().trim().max(200).default('')});
 export const salarySchema=z.object({month,day,amount:z.number().int().min(1).max(100000000),note:z.string().trim().max(200).default('')});
@@ -67,12 +67,12 @@ async function syncLogin(employee,{appAccess,password}){
  if(!employee.mobile)fail(400,'Add the employee’s mobile number to give them app access. They sign in with it.');
  if(await User.exists({email:employee.mobile,_id:{$ne:user?._id}}))fail(409,'Another account already signs in with this mobile number.');
  if(!user&&!password)fail(400,'Set a password of at least 8 characters for the employee’s app login.');
- const target=user||new User({role:'staff'});const changed=password||target.email!==employee.mobile||!target.active;
- Object.assign(target,{email:employee.mobile,name:employee.name,outletId:employee.outletId,active:true});if(password)target.passwordHash=await bcrypt.hash(password,12);
+ const target=user||new User({role:'staff'});const duties=staffDuties(employee);const same=staffDuties(target).length===duties.length&&staffDuties(target).every((duty,i)=>duty===duties[i]);const changed=password||target.email!==employee.mobile||!target.active||!same;
+ Object.assign(target,{email:employee.mobile,name:employee.name,outletId:employee.outletId,duty:duties[0],duties,active:true});if(password)target.passwordHash=await bcrypt.hash(password,12);
  await target.save();if(user&&changed)await Session.deleteMany({userId:target.id});employee.userId=target.id;
 }
 export async function saveEmployee(employee,data){
- const {appAccess,password,...fields}=data;Object.assign(employee,fields);
+ const {appAccess,password,...fields}=data;const duties=fields.duties||fields.duty?staffDuties(fields):staffDuties(employee);Object.assign(employee,{...fields,duties,duty:duties[0]});
  await syncLogin(employee,{appAccess,password});await employee.save();return employee;
 }
 export async function listEmployees(outletId,salaryMonth){
