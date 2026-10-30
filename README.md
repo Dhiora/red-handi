@@ -24,12 +24,20 @@ red-handi/
 
 ## Getting started
 
+Install Node.js 20 or newer, clone the repo, then run one command from this folder:
+
 ```bash
-npm run install:all          # installs backend and frontend dependencies
-cp backend/.env.example backend/.env   # optional; without MONGODB_URI a local MongoDB is started in dev
+npm run setup
+```
+
+That installs the website and the kitchen app, creates `backend/.env` when it is missing, and downloads the local MongoDB program. It does not overwrite an existing `.env`. With the generated file, this computer starts its own database on `127.0.0.1:27018` and does not call Razorpay.
+
+```bash
 npm run dev                  # this computer only: http://127.0.0.1:5173
 npm run global               # every device on this Wi-Fi, at the address printed on startup
 ```
+
+The first start creates the menu and writes the admin password to `backend/.data/local-admin-password`. Sign in at http://127.0.0.1:5173/admin with `admin@redhandi.com`.
 
 Run only the frontend with `FRONTEND_ONLY=true npm run dev`.
 
@@ -37,6 +45,7 @@ Run only the frontend with `FRONTEND_ONLY=true npm run dev`.
 
 | Command | What it does |
 | --- | --- |
+| `npm run setup` | Installs everything on a newly cloned computer |
 | `npm run dev` | Starts frontend and backend on this computer only |
 | `npm run global` | Same servers, reachable by other devices on this Wi-Fi |
 | `npm run build` | Builds the frontend into `frontend/dist` |
